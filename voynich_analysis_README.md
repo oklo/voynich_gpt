@@ -8,7 +8,11 @@ The setup uses a python virtual environment (rather than a conda env) to access 
 
 %source /Users/gl396/voynich_env/bin/activate
 
-voynich_env is additionally available as a kernel for the notebooks.
+That creates the virtual environment and permits bash workflow to use the packages. Inside the (voynich_env) shell,
+
+%jupyter lab
+
+creates a session for the notebooks that has access to the resources.
 
 The data/ directory has the initial processing workflow. The raw files, clean_{filename}.txt, are obtained via copy-paste from the Internet, with the Voynich Manuscript accessed using 
 
