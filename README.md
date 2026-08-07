@@ -4,6 +4,8 @@ This repository now contains a reproducible, falsification-first follow-up to
 the original exploratory notebooks.
 
 - [Research report](RESEARCH_REPORT.md)
+- [Research handoff](HANDOFF.md)
+- [Durable project memory](MEMORY.md)
 - `scripts/audit_voynich.py`: IVTFF-aware corpus parser, permutation tests,
   representation sensitivity, matched natural-language controls, and held-out
   sequence models
@@ -20,6 +22,9 @@ the original exploratory notebooks.
   a fitted Hebrew substitution and Voynich-native layout/copy generators
 - `scripts/estimate_information_bounds.py`: prequential universal-code bounds,
   294-language/historical reference ranges, and local word-order ablations
+- `scripts/residual_sequence_information.py`: held-out exact-token sequence
+  coding after morphology/Currier/topic/line-position conditioning, with
+  nuisance-matched permutations and reflowed language controls
 - `scripts/prepare_hebrew_htr_adaptation.py`: auditable PAGE-XML preparation for
   a small handwriting-recognition adaptation pilot on BnF Hébreu 1199
 - `tests/`: parser, corpus-integrity, distance, and negative-control regression

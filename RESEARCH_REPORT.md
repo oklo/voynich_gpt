@@ -715,6 +715,79 @@ ordinary marked word boundaries, plus a 1,939-word Latin fragment, can score
 as low or lower.  Those are failures of a whitespace-word comparison, not
 evidence that the sensitivity should be hidden.
 
+### Residual identity after conditioning morphology and layout
+
+The block shuffle above could still conceal a narrower lexical signal behind
+the manuscript's morphology and layout.  I therefore implemented the proposed
+conditional experiment in `scripts/residual_sequence_information.py`.
+
+The outer split again holds out whole quires.  For every target token, the
+decoder is first supplied with:
+
+- a declared morphology class (the primary run uses grouped-EVA token length);
+- Currier stratum;
+- illustration/topic class;
+- first/middle/last/single physical-line position; and
+- the morphology classes of the preceding same-line token and the vertically
+  aligned token on the preceding physical line.
+
+Only then does a hierarchical Bayesian code try to recover which of the 511
+frequent exact surface types (plus an unknown bucket) occurred.  Exact
+identities of the two causally prior neighbors are tested separately and as an
+equal-probability mixture.  The matched null independently permutes each
+neighbor identity within held-out Currier/topic/position/neighbor-morphology
+strata.  Thus the target, its morphology, layout, and neighbor shapes never
+move.  Controls are reflowed onto exactly the same page and line template and
+inherit the same nuisance labels.
+
+| Corpus | Procedural code | + exact neighbors | Net exact gain | Actual links over matched shuffle | Same-line part | Previous-line part |
+|---|---:|---:|---:|---:|---:|---:|
+| **Voynich** | 4.3927 | 4.4030 | **-0.0103** | **0.0673** | 0.0959 | 0.0180 |
+| English | 3.9823 | 3.6645 | 0.3178 | 0.3350 | 0.5498 | -0.0000 |
+| Hebrew Wikipedia | 2.7660 | 2.5799 | 0.1861 | 0.1477 | 0.2103 | 0.0065 |
+| Latin Wikipedia | 2.5014 | 2.3341 | 0.1673 | 0.1181 | 0.1548 | 0.0293 |
+| Spanish *Picatrix* | 3.3620 | 3.0121 | 0.3500 | 0.3492 | 0.5913 | 0.0021 |
+| Middle English *Cirurgie* | 4.3342 | 3.7855 | 0.5488 | 0.5411 | 0.8809 | 0.0155 |
+| *Picatrix*, word-shuffled | 3.3216 | 3.3421 | -0.0205 | -0.0015 | 0.0019 | -0.0059 |
+
+All values are bits per target word.  “Net exact gain” compares the actual
+exact-neighbor code with the morphology/layout/neighbor-shape code; positive
+values mean exact identities pay for their predictive complexity on unseen
+quires.  “Actual links over matched shuffle” holds the fitted exact-neighbor
+model fixed and asks whether the real links score better than nuisance-matched
+links.  The components need not sum to the mixture value because they are
+separate proper-probability experts.  In the 99-permutation joint run, every
+ordered corpus attained the minimum one-sided `p=0.01`; the shuffled negative
+control had `p=0.69`.  A separate 199-permutation Voynich run gave `p=0.005`.
+
+This changes “no identity-level order” into a more accurate result.  Voynich
+has a **real but weak** exact-identity association, concentrated in the
+preceding word, plus a small cross-line component.  Unlike every ordered
+control here, however, the exact-neighbor model does not improve held-out
+compression after morphology and layout are supplied.  The natural-language
+gains are 0.1673–0.5488 bit/word; Voynich is -0.0103.  A genuine word shuffle
+collapses both criteria, showing that the test is not manufacturing syntax
+from frequencies or inherited layout labels.
+
+The conclusion is stable but the exact effect size is model-dependent.  With
+128, 512, and 2,048 identities, Voynich's net gain is respectively +0.0094,
+-0.0103, and -0.0725 bit/word; its actual-link advantage over matched shuffles
+is 0.0397, 0.0673, and 0.0681.  Changing the Bayesian strength from 5 to 100
+moves those figures over -0.0487 to +0.0029 and 0.1057 to 0.0304.  Supplying
+the first and last grouped-EVA units as additional morphology reduces the
+remaining residual code from 4.3927 to 1.3206 bit/word and the matched-link
+advantage to 0.0016.  That finer result is a sensitivity bound, not the primary
+cross-script comparison: edge characters identify ordinary-language words at
+different rates and therefore overcondition the controls unevenly.
+
+This is not an information-theoretic upper bound on all possible payload.  It
+is a predictive bound for exact frequent token identities under declared
+surface morphology and two local links.  A latent class, altered boundary,
+homophonic code, or longer-range decoder could recover information this model
+cannot see.  What it establishes is narrower: after the strongest observed
+procedural variables are supplied, ordinary exact-word syntax is still not a
+useful held-out compressor of Voynichese.
+
 ### Strongest defensible conclusion
 
 The entropy inversion does **not** prove that the manuscript has no linguistic
@@ -728,10 +801,12 @@ precise statement:
 > syntax is visible in their sequence.
 
 This conclusion joins three independent observations: anomalously predictable
-word-internal spelling, essentially absent local identity-level word order,
-and a substantial held-out gain from physical line position.  The information
-that a normal text places in word sequence appears here primarily in word
-shape and layout.
+word-internal spelling, weak rather than absent local identity-level word
+order, and a substantial held-out gain from physical line position.  After
+conditioning on morphology and layout, real neighbor links retain only a small
+association and do not improve the held-out code.  The information that a
+normal text places in word sequence appears here primarily in word shape and
+layout.
 
 The surviving meaningful-text alternatives are consequently specific rather
 than unlimited: the marked spaces may not be linguistic boundaries; a
@@ -788,11 +863,13 @@ predictions.
    recoverable bits per line and show a stable decoder on held-out pages.  If a
    pseudotext model is proposed, show that it compresses the manuscript better
    than the best meaningful-code alternative.
-6. **Condition away morphology and layout, then measure residual order.** Fit
-   the word-form and line-position model on held-out quires and test whether
-   any page-local or cross-line predictive information remains after those
-   variables are supplied.  This is the most direct next bound on a possible
-   sequential payload; raw character entropy cannot provide it.
+6. **Explain the measured residual links.** Morphology/layout conditioning now
+   leaves a small 0.067-bit/word matched-link advantage but no net compression
+   gain.  The next model should separate boundary-glyph agreement, copy/edit
+   families, latent lexical classes, and paragraph state, with every component
+   selected on training quires.  It must beat both the procedural baseline and
+   matched permutations on unseen quires; otherwise the residual is better
+   treated as a production trace than a payload channel.
 
 The low-hanging fruit was not a hidden English sentence waiting for a larger
 Transformer.  It was a set of methodological cleanups and falsification tests:
@@ -896,6 +973,23 @@ python3 scripts/estimate_information_bounds.py \
   --word-concentration 100 \
   --word-max-order 2 \
   --order-shuffles 4
+```
+
+The residual-identity experiment uses the same public comparison checkout.
+The shuffled control is generated in memory from the same *Picatrix* words;
+it is not the repository's older line-shuffled Capote file.
+
+```bash
+python3 scripts/residual_sequence_information.py \
+  --morphology-depth 0 \
+  --vocabulary 512 \
+  --strength 20 \
+  --permutations 99 \
+  --control 'Hebrew Wikipedia=/tmp/voynich-public-entropy/Corpora/Wikipedia_texts/full/Hebrew' \
+  --control 'Latin Wikipedia=/tmp/voynich-public-entropy/Corpora/Wikipedia_texts/full/Latin' \
+  --control 'Spanish Picatrix=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix' \
+  --control 'Middle English Cirurgie=/tmp/voynich-public-entropy/Corpora/Historical_texts/Cirurgie' \
+  --shuffled-control 'Spanish Picatrix shuffled=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix'
 ```
 
 The HTR preparation tool takes a Kraken PAGE-XML file containing baseline OCR
