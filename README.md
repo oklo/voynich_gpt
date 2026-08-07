@@ -18,6 +18,8 @@ the original exploratory notebooks.
   zodiac/month crib test with global-key, held-out, and shuffled-sign controls
 - `scripts/compare_mechanisms.py`: held-out quire likelihood tournament between
   a fitted Hebrew substitution and Voynich-native layout/copy generators
+- `scripts/estimate_information_bounds.py`: prequential universal-code bounds,
+  294-language/historical reference ranges, and local word-order ablations
 - `scripts/prepare_hebrew_htr_adaptation.py`: auditable PAGE-XML preparation for
   a small handwriting-recognition adaptation pilot on BnF Hébreu 1199
 - `tests/`: parser, corpus-integrity, distance, and negative-control regression

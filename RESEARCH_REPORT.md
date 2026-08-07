@@ -605,11 +605,146 @@ What it establishes is that unseen Voynich is dramatically better predicted by
 its own layout-coupled morphological process than by the strongest simple
 Hebrew substitution tested.
 
+## Information-content inversion: what can actually be bounded?
+
+There are three quantities that are easy to conflate:
+
+1. a plug-in character statistic such as bigram conditional entropy;
+2. the number of bits in a lossless description of this particular
+   transcription;
+3. the semantic or propositional content available to a knowledgeable reader.
+
+Only the second admits a direct upper bound from the inscription alone.  A
+lossless code can show that no more than a stated number of bits are needed to
+reconstruct the normalized surface string.  It cannot say how much the string
+means, whether distinctions were discarded before writing, or how much shared
+knowledge resides in a decoder.  A short formula can denote a large object;
+formulaic instructions can be meaningful; and a low-rate payload can sit in a
+highly redundant carrier.
+
+This distinction is especially important here because the low conditional
+entropy of Voynichese is established prior art, not a new observation.
+Lindemann and Bowern compared it with 294 modern-language samples and
+historical manuscripts and found unusually constrained within-word character
+placement across alternative Voynich transcription systems ([paper](https://arxiv.org/abs/2010.14697),
+[corpus](https://github.com/chirila/Voynich-public)).  But a bigram comparison
+is not an entropy-rate estimate.  Shannon's long-context prediction experiment
+put ordinary literary English at roughly one bit per letter, far below its
+short-context estimate ([Shannon 1951](https://www.nokia.com/bell-labs/publications-and-media/publications/prediction-and-entropy-of-printed-english/)).
+Thus a weak compressor can make natural language look more informative than it
+really is.
+
+### Prequential lossless-code experiment
+
+`scripts/estimate_information_bounds.py` uses a proper online Bayesian mixture
+of character context models of orders zero through eight.  It predicts each
+symbol before updating its counts, uses a Krichevsky--Trofimov base prior, and
+Bayesian-averages the context orders.  Learning and order selection are
+therefore charged to the code rather than estimated in-sample.  Every word is
+represented as normalized characters followed by one boundary event.  The
+primary Voynich input is the 34,411 certain paragraph-text tokens from the
+IVTFF source, using raw EVA codepoints.
+
+Four fresh 50,000-unit windows per sufficiently long corpus make warm-up cost
+comparable.  The external controls are the Lindemann--Bowern corpus at git
+commit `decc4caaa6515b86e42a219d1da8d81114736f2e`; 288 modern samples and 18
+historical texts have at least one full window.
+
+| Sample group | Corpus-level median range (bits/unit) | Group median | At or below Voynich |
+|---|---:|---:|---:|
+| Voynich IVTFF certain raw EVA | 1.8836 (window range 1.8261–2.0028) | 1.8836 | — |
+| 288 modern-language samples | 0.2017–8.8298 | 2.8735 | 4 |
+| 138 modern samples with alphabet size 15–35 | 0.2017–3.2497 | 2.8134 | 2 |
+| 18 sufficiently long historical texts | 2.3416–3.7782 | 2.6103 | 0 |
+
+The entire 208,733-unit Voynich stream receives a code of 394,854 bits, or
+49,357 bytes (1.89167 bits/unit).  This is a reproducible upper bound on the
+exact normalized surface stream conditional on the declared alphabet and
+shared coding algorithm.  It is **not** an estimate of 49 kB of meaning.
+
+The broad comparison also prevents an overclaim.  Four modern samples fall
+below Voynich:
+
+| Control | Median bits/unit | Audit |
+|---|---:|---|
+| Sranan | 0.2017 | long passages recur nearly verbatim across entries |
+| Oriya | 0.7824 | dominated by repeated year/month and event templates |
+| Bishnupriya Manipuri | 0.9374 | dominated by repeated city/population templates |
+| Pali | 1.7846 | a short, genuinely meaningful but highly formulaic Vinaya/rule text |
+
+The first three expose corpus-quality failures.  The fourth is a substantive
+counterexample: meaningful specialized writing can be at least this
+predictable.  Removing controls after observing their scores would not support
+a valid universal exclusion.  Nor are the language samples independent random
+draws, so the script's exchangeability rank bounds are diagnostics, not
+frequentist p-values.
+
+### Where the information sits: a local word-order ablation
+
+The more discriminating result concerns the *kind* of predictability.  For
+each corpus, up to the first 30,000 marked words in the same 200,000-unit
+prefix are collapsed to the 511 most common surface types plus an unknown
+type.  A smoothed Bayesian word-context code is
+then applied to the original sequence and to four deterministic shuffles
+within 100-word blocks.  The shuffle preserves vocabulary, frequencies, word
+spellings, and broad topic while disrupting local syntax and discourse order.
+The difference in code length is recoverable local word-order information.
+
+| Corpus | Gain from original local order (bits/word) |
+|---|---:|
+| Voynich | **approximately 0.0000** |
+| English Wikipedia | 0.3564 |
+| French Wikipedia | 0.6712 |
+| Hebrew Wikipedia | 0.1943 |
+| Latin Wikipedia | 0.1856 |
+| Middle English *Cirurgie* | 0.8911 |
+| Hebrew Mishneh | 0.8612 |
+| Spanish *Picatrix* | 0.7373 |
+
+Across all 294 modern controls the median gain is 0.4983 bits/word; across all
+24 historical controls it is 0.3116.  Every control exceeds Voynich
+numerically at the primary setting, although an unspaced Burmese sample also
+rounds to zero.  This result is not an accident of a single smoothing value:
+over 81 Voynich combinations of context order, block size, backoff strength,
+and vocabulary cutoff, the gain ranges from numerical zero to 0.0261 bit/word,
+with a median of zero.
+
+It is also not fully representation-invariant.  With only 127 retained word
+types, Voynich gains 0.0155 bit/word; Chinese and Burmese samples without
+ordinary marked word boundaries, plus a 1,939-word Latin fragment, can score
+as low or lower.  Those are failures of a whitespace-word comparison, not
+evidence that the sensitivity should be hidden.
+
+### Strongest defensible conclusion
+
+The entropy inversion does **not** prove that the manuscript has no linguistic
+or semantic payload, and the requested “below the range of language” premise
+is false for a genuinely broad, genre-diverse range.  It does support a more
+precise statement:
+
+> Voynichese is strongly inconsistent with ordinary communicative prose in
+> which the marked spaces delimit reusable words, frequent surface word types
+> consistently represent frequent lexical or grammatical units, and local
+> syntax is visible in their sequence.
+
+This conclusion joins three independent observations: anomalously predictable
+word-internal spelling, essentially absent local identity-level word order,
+and a substantial held-out gain from physical line position.  The information
+that a normal text places in word sequence appears here primarily in word
+shape and layout.
+
+The surviving meaningful-text alternatives are consequently specific rather
+than unlimited: the marked spaces may not be linguistic boundaries; a
+homophonic, verbose, or lossy code may fragment stable word identities; the
+document may be a nomenclator, table, or other low-entropy notation; or a
+low-rate payload may be carried by a largely procedural surface.  Otherwise,
+layout-conditioned pseudotext is now the simpler account.
+
 ## Hypothesis ledger
 
 | Hypothesis | What it explains | Main contradiction | Current status |
 |---|---|---|---|
-| Ordinary plaintext in an unknown script | Frequencies, word-like morphology, sections | Very weak cross-word order; extreme line effects | Strongly disfavored under EVA word boundaries |
+| Ordinary plaintext in an unknown script | Frequencies, word-like morphology, sections | Word shuffling loses approximately zero bits under the primary common-word model; extreme line effects | Strongly disfavored under EVA word boundaries and stable word identities |
 | Simple monoalphabetic substitution | Same as plaintext while hiding letters | Preserves sequence/repetition information; fitted Hebrew model loses about 1.81–1.88 held-out bits/unit to native/layout models | Strongly disfavored |
 | Hebrew/other abjad plus word anagramming | Word-shape rank; herbal-specific match to period Hebrew controls; low vowels | No coherent output; herbal formula sequences absent; no Hebrew zodiac vocabulary under global exact keys; order signal too weak | Shape-level lead only; simple Hebrew translation/cipher versions strongly disfavored |
 | Verbose, lossy, or homophonic cipher | Can suppress visible lexical/syntactic repetition | Must also explain line position and local variants; very flexible | Viable but presently underspecified |
@@ -653,6 +788,11 @@ predictions.
    recoverable bits per line and show a stable decoder on held-out pages.  If a
    pseudotext model is proposed, show that it compresses the manuscript better
    than the best meaningful-code alternative.
+6. **Condition away morphology and layout, then measure residual order.** Fit
+   the word-form and line-position model on held-out quires and test whether
+   any page-local or cross-line predictive information remains after those
+   variables are supplied.  This is the most direct next bound on a possible
+   sequential payload; raw character entropy cannot provide it.
 
 The low-hanging fruit was not a hidden English sentence waiting for a larger
 Transformer.  It was a set of methodological cleanups and falsification tests:
@@ -729,6 +869,33 @@ python3 scripts/compare_mechanisms.py \
   --order 2 \
   --key-restarts 5 \
   --key-steps 6000
+```
+
+The information-bound benchmark uses the public Lindemann--Bowern comparison
+corpora.  The recorded run used commit
+`decc4caaa6515b86e42a219d1da8d81114736f2e`:
+
+```bash
+git clone --depth 1 \
+  https://github.com/chirila/Voynich-public.git \
+  /tmp/voynich-public-entropy
+
+python3 scripts/estimate_information_bounds.py \
+  --comparison-root /tmp/voynich-public-entropy/Corpora \
+  --window-size 50000 \
+  --maximum-windows 4 \
+  --max-order 8
+
+python3 scripts/estimate_information_bounds.py \
+  --comparison-root /tmp/voynich-public-entropy/Corpora \
+  --skip-character \
+  --word-order-all \
+  --order-words 30000 \
+  --order-block-size 100 \
+  --order-vocabulary 512 \
+  --word-concentration 100 \
+  --word-max-order 2 \
+  --order-shuffles 4
 ```
 
 The HTR preparation tool takes a Kraken PAGE-XML file containing baseline OCR
