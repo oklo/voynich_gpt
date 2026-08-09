@@ -20,12 +20,15 @@ paragraph/layout fields, and the declared source morphology strata.
 
 The result is a predictive decomposition for a finite model family, not an
 upper bound on semantic content or a claim that the learned classes are parts
-of speech.
+of speech.  ``--token-output`` optionally writes held-out token coordinates,
+expert losses, mixture responsibilities, and mean matched-null residuals as
+JSONL for spatial diagnostics; a ``.gz`` suffix compresses the trace.
 """
 
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import math
 import random
@@ -33,7 +36,7 @@ import statistics
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping, Sequence, TextIO
 
 from audit_voynich import Page, eva_units, parse_ivtff
 from compare_mechanisms import EditParameters, edit_probability, line_position
@@ -87,7 +90,11 @@ class DecompositionRecord:
     position: str
     paragraph_state: str
     page: str
+    page_index: int
     quire: str
+    line_index: int
+    word_index: int
+    line_length: int
     previous_word: str | None
     previous_morphology: Morphology | None
     previous_line_word: str | None
@@ -176,9 +183,9 @@ def records_from_structured(
     pages: Sequence[StructuredPage], *, morphology_depth: int, grouped_eva: bool
 ) -> list[DecompositionRecord]:
     result: list[DecompositionRecord] = []
-    for page in pages:
+    for page_index, page in enumerate(pages):
         previous_line: StructuredLine | None = None
-        for line in page.lines:
+        for physical_line_index, line in enumerate(page.lines):
             for index, word in enumerate(line.words):
                 previous_word = line.words[index - 1] if index else None
                 previous_line_index = nearest_previous_line_index(
@@ -202,7 +209,11 @@ def records_from_structured(
                         position=line_position(index, len(line.words)),
                         paragraph_state=paragraph_state(line),
                         page=page.name,
+                        page_index=page_index,
                         quire=page.quire,
+                        line_index=physical_line_index,
+                        word_index=index,
+                        line_length=len(line.words),
                         previous_word=previous_word,
                         previous_morphology=(
                             morphology_signature(
@@ -1245,6 +1256,151 @@ def summarize_weights(
     }
 
 
+def source_link_signature(record: DecompositionRecord) -> tuple[object, ...]:
+    """Return the exact source state changed by the matched-link null."""
+
+    return (
+        record.previous_word,
+        record.previous_line_word,
+        record.previous_line_words,
+    )
+
+
+def open_token_trace(path: Path) -> TextIO:
+    """Open JSONL output, using gzip when requested by suffix."""
+
+    if path.suffix == ".gz":
+        return gzip.open(path, "wt", encoding="utf-8")
+    return path.open("w", encoding="utf-8")
+
+
+def token_trace_payload(
+    *,
+    corpus_name: str,
+    fold_index: int,
+    record: DecompositionRecord,
+    suite: ExpertSuite,
+    actual_row: Mapping[str, float],
+    weights: Mapping[str, Mapping[str, float]],
+    morphology_depth: int,
+    permutations: int,
+    changed_count: int,
+    permuted_expert_loss_sums: Sequence[float] | None,
+    permuted_family_loss_sums: Sequence[float] | None,
+) -> dict[str, object]:
+    """Build one self-describing held-out token record for graphics."""
+
+    expert_names = ExpertSuite.expert_names
+    family_names = tuple(ExpertSuite.family_names)
+    expert_losses = {
+        name: -math.log2(actual_row[name]) for name in expert_names
+    }
+    family_probabilities = {
+        family: mixture_probability(actual_row, weights[family])
+        for family in family_names
+    }
+    family_losses = {
+        family: -math.log2(probability)
+        for family, probability in family_probabilities.items()
+    }
+    base_loss = expert_losses["base"]
+    full_probability = family_probabilities["full"]
+    full_weights = weights["full"]
+    responsibilities = {
+        name: full_weights.get(name, 0.0) * actual_row[name] / full_probability
+        for name in expert_names
+    }
+    dominant_expert = max(
+        expert_names,
+        key=lambda name: (responsibilities[name], name),
+    )
+
+    target_units = suite.units(record.word)
+    previous_units = (
+        suite.units(record.previous_word)
+        if record.previous_word is not None
+        else ()
+    )
+    encoded = suite.encode(record)
+    matched_null: dict[str, object] | None = None
+    if permutations:
+        if (
+            permuted_expert_loss_sums is None
+            or permuted_family_loss_sums is None
+        ):
+            raise ValueError("Token trace is missing matched-null accumulators")
+        expert_mean_losses = {
+            name: permuted_expert_loss_sums[index] / permutations
+            for index, name in enumerate(expert_names)
+        }
+        family_mean_losses = {
+            family: permuted_family_loss_sums[index] / permutations
+            for index, family in enumerate(family_names)
+        }
+        matched_null = {
+            "permutations": permutations,
+            "source_changed_fraction": changed_count / permutations,
+            "expert_mean_log_loss_bits": expert_mean_losses,
+            "expert_actual_advantage_bits": {
+                name: expert_mean_losses[name] - expert_losses[name]
+                for name in expert_names
+            },
+            "family_mean_log_loss_bits": family_mean_losses,
+            "family_actual_advantage_bits": {
+                family: family_mean_losses[family] - family_losses[family]
+                for family in family_names
+            },
+        }
+
+    return {
+        "schema": "voynich-residual-token-trace-v1",
+        "corpus": corpus_name,
+        "outer_fold": fold_index,
+        "page": record.page,
+        "page_index_zero_based": record.page_index,
+        "quire": record.quire,
+        "currier": record.currier,
+        "topic": record.topic,
+        "physical_line_index_zero_based": record.line_index,
+        "word_index_zero_based": record.word_index,
+        "line_length": record.line_length,
+        "normalized_word_midpoint": (
+            record.word_index + 0.5
+        ) / record.line_length,
+        "line_position": record.position,
+        "paragraph_state": record.paragraph_state,
+        "paragraph_start": record.paragraph_state.startswith("0:"),
+        "target_word": record.word,
+        "target_identity_bucket": encoded.target,
+        "target_morphology": record.morphology,
+        "morphology_depth": morphology_depth,
+        "grouped_eva": suite.grouped_eva,
+        "training_vocabulary_size": len(suite.vocabulary),
+        "target_initial_unit": target_units[0] if target_units else None,
+        "target_final_unit": target_units[-1] if target_units else None,
+        "previous_word": record.previous_word,
+        "previous_morphology": record.previous_morphology,
+        "previous_final_unit": previous_units[-1] if previous_units else None,
+        "aligned_previous_line_word": record.previous_line_word,
+        "aligned_previous_line_morphology": record.previous_line_morphology,
+        "aligned_previous_line_index_zero_based": record.previous_line_index,
+        "previous_line_words": record.previous_line_words,
+        "previous_line_morphologies": record.previous_line_morphologies,
+        "expert_log_loss_bits": expert_losses,
+        "expert_gain_over_base_bits": {
+            name: base_loss - loss for name, loss in expert_losses.items()
+        },
+        "family_log_loss_bits": family_losses,
+        "family_gain_over_base_bits": {
+            family: base_loss - loss for family, loss in family_losses.items()
+        },
+        "full_mixture_weights": full_weights,
+        "full_mixture_responsibility": responsibilities,
+        "dominant_full_expert": dominant_expert,
+        "matched_null": matched_null,
+    }
+
+
 def audit_corpus(
     name: str,
     pages: Sequence[StructuredPage],
@@ -1258,6 +1414,7 @@ def audit_corpus(
     strength: float,
     permutations: int,
     seed: int,
+    token_trace: TextIO | None = None,
 ) -> dict[str, object]:
     records = records_from_structured(
         pages,
@@ -1296,6 +1453,20 @@ def audit_corpus(
             grouped_eva=grouped_eva,
         )
         actual_rows = [suite.probability_row(record) for record in heldout]
+        trace_expert_sums = (
+            [[0.0] * len(ExpertSuite.expert_names) for _ in heldout]
+            if token_trace is not None and permutations
+            else None
+        )
+        trace_family_names = tuple(ExpertSuite.family_names)
+        trace_family_sums = (
+            [[0.0] * len(trace_family_names) for _ in heldout]
+            if token_trace is not None and permutations
+            else None
+        )
+        trace_changed_counts = (
+            [0] * len(heldout) if token_trace is not None else None
+        )
         fold_bits: dict[str, float] = {}
         for family, family_weights in weights.items():
             bits = score_rows(actual_rows, family_weights)
@@ -1319,8 +1490,66 @@ def audit_corpus(
                 bits = score_rows(permuted_rows, family_weights)
                 permutation_totals[family][permutation_index] += bits
                 fold_permutation_bits[family].append(bits)
+            if token_trace is not None:
+                if (
+                    trace_expert_sums is None
+                    or trace_family_sums is None
+                    or trace_changed_counts is None
+                ):
+                    raise ValueError("Token trace accumulators were not initialized")
+                for record_index, (
+                    actual_record,
+                    permuted_record,
+                    permuted_row,
+                ) in enumerate(zip(heldout, permuted, permuted_rows, strict=True)):
+                    if source_link_signature(actual_record) != source_link_signature(
+                        permuted_record
+                    ):
+                        trace_changed_counts[record_index] += 1
+                    for expert_index, expert_name in enumerate(
+                        ExpertSuite.expert_names
+                    ):
+                        trace_expert_sums[record_index][expert_index] -= math.log2(
+                            permuted_row[expert_name]
+                        )
+                    for family_index, family in enumerate(trace_family_names):
+                        trace_family_sums[record_index][family_index] -= math.log2(
+                            mixture_probability(permuted_row, weights[family])
+                        )
             changed_totals[permutation_index] += changed
             fold_changed.append(changed)
+
+        if token_trace is not None:
+            if trace_changed_counts is None:
+                raise ValueError("Token trace change counts were not initialized")
+            for record_index, (record, actual_row) in enumerate(
+                zip(heldout, actual_rows, strict=True)
+            ):
+                payload = token_trace_payload(
+                    corpus_name=name,
+                    fold_index=fold_index,
+                    record=record,
+                    suite=suite,
+                    actual_row=actual_row,
+                    weights=weights,
+                    morphology_depth=morphology_depth,
+                    permutations=permutations,
+                    changed_count=trace_changed_counts[record_index],
+                    permuted_expert_loss_sums=(
+                        trace_expert_sums[record_index]
+                        if trace_expert_sums is not None
+                        else None
+                    ),
+                    permuted_family_loss_sums=(
+                        trace_family_sums[record_index]
+                        if trace_family_sums is not None
+                        else None
+                    ),
+                )
+                token_trace.write(
+                    json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    + "\n"
+                )
 
         fold_results.append(
             {
@@ -1405,6 +1634,7 @@ def audit(
     strength: float,
     permutations: int,
     seed: int,
+    token_trace: TextIO | None = None,
 ) -> dict[str, object]:
     source_pages = [page for page in parse_ivtff(source) if page.lines("P", True)]
     template = pages_to_structured(source_pages)
@@ -1423,6 +1653,7 @@ def audit(
                 strength=strength,
                 permutations=permutations,
                 seed=seed,
+                token_trace=token_trace,
             )
         )
     control_metadata: list[dict[str, object]] = []
@@ -1446,6 +1677,7 @@ def audit(
                 strength=strength,
                 permutations=permutations,
                 seed=derived_seed(seed, "decomposition", control_name, str(path)),
+                token_trace=token_trace,
             )
         )
         control_metadata.append(
@@ -1487,6 +1719,7 @@ def audit(
             "Latent classes are distributional clusters, not asserted linguistic categories.",
             "Positive held-out gain is model-family-specific recoverable information.",
             "Matched permutations preserve declared source morphology but not unknown production state.",
+            "Per-token mixture responsibilities route probability among correlated experts; they are not information shares.",
         ],
     }
 
@@ -1560,21 +1793,63 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=408)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--token-output",
+        type=Path,
+        help=(
+            "Write one JSONL row per outer-held-out token with expert losses, "
+            "mixture responsibilities, and mean matched-null residuals; a .gz "
+            "suffix enables gzip compression"
+        ),
+    )
     parser.add_argument("--skip-voynich", action="store_true")
     args = parser.parse_args()
-    result = audit(
-        args.source,
-        args.controls,
-        include_voynich=not args.skip_voynich,
-        outer_folds=args.outer_folds,
-        inner_folds=args.inner_folds,
-        morphology_depth=args.morphology_depth,
-        vocabulary_limit=args.vocabulary,
-        alpha=args.alpha,
-        strength=args.strength,
-        permutations=args.permutations,
-        seed=args.seed,
+    if args.output is not None and args.output == args.token_output:
+        parser.error("--output and --token-output must be different paths")
+    token_trace = (
+        open_token_trace(args.token_output)
+        if args.token_output is not None
+        else None
     )
+    try:
+        result = audit(
+            args.source,
+            args.controls,
+            include_voynich=not args.skip_voynich,
+            outer_folds=args.outer_folds,
+            inner_folds=args.inner_folds,
+            morphology_depth=args.morphology_depth,
+            vocabulary_limit=args.vocabulary,
+            alpha=args.alpha,
+            strength=args.strength,
+            permutations=args.permutations,
+            seed=args.seed,
+            token_trace=token_trace,
+        )
+    finally:
+        if token_trace is not None:
+            token_trace.close()
+    if args.token_output is not None:
+        result["token_trace"] = {
+            "path": str(args.token_output),
+            "sha256": sha256(args.token_output),
+            "format": (
+                "gzip-compressed newline-delimited JSON"
+                if args.token_output.suffix == ".gz"
+                else "newline-delimited JSON"
+            ),
+            "schema": "voynich-residual-token-trace-v1",
+            "rows": sum(corpus["heldout_scored_words"] for corpus in result["corpora"]),
+            "matched_residual_definition": (
+                "mean permuted log loss minus actual log loss; positive favors "
+                "the actual source link"
+            ),
+            "output_order": (
+                "outer fold then source-corpus order; sort page_index_zero_based, "
+                "physical_line_index_zero_based, word_index_zero_based for "
+                "manuscript order"
+            ),
+        }
     if args.output is not None:
         args.output.write_text(
             json.dumps(result, indent=2, sort_keys=True) + "\n",
@@ -1586,6 +1861,10 @@ def main() -> None:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         print_summary(result)
+    if args.token_output is not None and not (
+        args.json and args.output is None
+    ):
+        print(f"Wrote {args.token_output}")
 
 
 if __name__ == "__main__":

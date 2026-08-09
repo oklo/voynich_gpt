@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import gzip
+import io
+import json
+import statistics
 import sys
+import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -13,9 +18,11 @@ from decompose_residual_links import (  # noqa: E402
     ExpertSuite,
     StructuredLine,
     StructuredPage,
+    audit_corpus,
     fit_mixture_weights,
     matched_source_permutation,
     nearest_previous_line_index,
+    open_token_trace,
     reflow_structured,
 )
 from residual_sequence_information import morphology_signature  # noqa: E402
@@ -40,7 +47,11 @@ def record(
         position="middle",
         paragraph_state="1:open",
         page="f1r",
+        page_index=0,
         quire="A",
+        line_index=0,
+        word_index=1,
+        line_length=3,
         previous_word=previous_word,
         previous_morphology=SHAPE if previous_word is not None else None,
         previous_line_word=previous_line_word,
@@ -207,6 +218,89 @@ class ResidualLinkDecompositionTests(unittest.TestCase):
         self.assertEqual(
             morphology_signature("aa", depth=0, grouped_eva=False), SHAPE
         )
+
+    def test_token_trace_reconstructs_actual_and_matched_scores(self):
+        pages = [
+            StructuredPage(
+                f"f{index + 1}r",
+                quire,
+                "A",
+                "H",
+                (
+                    StructuredLine(("aa", "bb", "aa"), 0, True, False),
+                    StructuredLine(("bb", "aa", "bb"), 1, False, True),
+                ),
+            )
+            for index, quire in enumerate(("A", "B", "C", "D"))
+        ]
+        trace = io.StringIO()
+        result = audit_corpus(
+            "synthetic",
+            pages,
+            outer_folds=2,
+            inner_folds=2,
+            morphology_depth=0,
+            grouped_eva=False,
+            vocabulary_limit=16,
+            alpha=0.5,
+            strength=2.0,
+            permutations=3,
+            seed=7,
+            token_trace=trace,
+        )
+        rows = [json.loads(line) for line in trace.getvalue().splitlines()]
+        self.assertEqual(len(rows), result["heldout_scored_words"])
+        self.assertEqual(rows[0]["schema"], "voynich-residual-token-trace-v1")
+        self.assertIn(rows[0]["dominant_full_expert"], ExpertSuite.expert_names)
+        self.assertAlmostEqual(
+            sum(rows[0]["full_mixture_responsibility"].values()), 1.0
+        )
+        self.assertAlmostEqual(
+            statistics.fmean(row["family_log_loss_bits"]["full"] for row in rows),
+            result["bits_per_word"]["full"],
+        )
+        self.assertAlmostEqual(
+            statistics.fmean(
+                row["matched_null"]["family_mean_log_loss_bits"]["full"]
+                for row in rows
+            ),
+            result["matched_permutation"]["families"]["full"][
+                "permuted_bits_per_word_mean"
+            ],
+        )
+        self.assertAlmostEqual(
+            statistics.fmean(
+                row["matched_null"]["family_actual_advantage_bits"]["full"]
+                for row in rows
+            ),
+            result["matched_permutation"]["families"]["full"][
+                "actual_gain_over_permutation_bits_per_word"
+            ],
+        )
+        self.assertAlmostEqual(
+            statistics.fmean(
+                row["matched_null"]["source_changed_fraction"] for row in rows
+            ),
+            result["matched_permutation"]["mean_changed_fraction"],
+        )
+        linked = next(row for row in rows if row["previous_word"] is not None)
+        self.assertEqual(linked["previous_final_unit"], "a")
+        self.assertEqual(linked["target_initial_unit"], "b")
+        self.assertGreaterEqual(
+            linked["matched_null"]["source_changed_fraction"], 0.0
+        )
+        self.assertLessEqual(
+            linked["matched_null"]["source_changed_fraction"], 1.0
+        )
+
+    def test_token_trace_gzip_suffix_is_readable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl.gz"
+            handle = open_token_trace(path)
+            handle.write('{"ok":true}\n')
+            handle.close()
+            with gzip.open(path, "rt", encoding="utf-8") as compressed:
+                self.assertEqual(json.loads(compressed.read()), {"ok": True})
 
 
 if __name__ == "__main__":

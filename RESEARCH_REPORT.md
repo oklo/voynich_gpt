@@ -877,6 +877,39 @@ cross-space glyph boundary, whereas the tested ordered prose allocates much
 more to exact predecessor identity or latent classes.  This finite audit is
 neither a semantic-information bound nor proof of nonlanguage.
 
+#### Token-level trace for spatial graphics
+
+The decomposition can optionally emit one newline-delimited JSON record for
+every outer-held-out token:
+
+```bash
+python3 scripts/decompose_residual_links.py \
+  --outer-folds 5 --inner-folds 3 \
+  --morphology-depth 0 --vocabulary 512 --strength 20 \
+  --permutations 49 \
+  --output /tmp/voynich_depth0_trace_summary.json \
+  --token-output /tmp/voynich_depth0_token_trace.jsonl.gz
+```
+
+The `.gz` suffix enables transparent compression.  Schema
+`voynich-residual-token-trace-v1` records page, physical line, word index,
+paragraph state, Currier/topic/quire labels, source and target morphology,
+the previous-final/target-initial boundary pair, every expert and family log
+loss, full-mixture weights and per-token responsibilities, and mean matched-null
+losses and actual-link advantages.  Positive null residual means the real
+source link codes that token better than its average matched source.  Mixture
+responsibilities show which correlated expert supplied probability for a token;
+they are not additive shares of information.
+
+The final trace has 34,411 rows and is 31 MB compressed.  Re-aggregating its
+rows exactly recovers 4.268812764 bit/word actual full-model loss,
+4.386827062 matched-null loss, and the 0.118014297 advantage above.  Its
+SHA-256 is
+`a23ede848bf684aa222d0f4241fa5c9082e75401927c72f14b4ad3f22e84dbd7`.
+Rows are written by outer fold; sort their zero-based page, physical-line, and
+word indices for manuscript order.  This trace directly supports both a
+boundary-transition residual atlas and a folio-level expert-responsibility map.
+
 ### Strongest defensible conclusion
 
 The entropy inversion does **not** prove that the manuscript has no linguistic

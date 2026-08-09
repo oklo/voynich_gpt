@@ -104,14 +104,21 @@ shuffle.
 - Existing pushed checkpoints before the residual experiment:
   - `3c5c140 Add reproducible Voynich hypothesis audits`
   - `b00c864 Add information bound and word order benchmarks`
+  - `4a32e24 Measure residual Voynich sequence information`
+  - `25cc02e Decompose residual Voynich sequence signal`
 - Test command: `python3 -m unittest discover -s tests -v`.
-- Current suite: 57 passing tests.
+- Current suite: 59 passing tests.
 - Ruff was unavailable in the August 2026 environment; do not imply it ran.
 
 ## Next priority
 
-Export per-token expert log losses and localize the boundary-dominated signal
-by quire, Currier, topic, paragraph position, and glyph pair.  Then test
+Use `--token-output` from `scripts/decompose_residual_links.py` to localize the
+boundary-dominated signal by quire, Currier, topic, paragraph position, and
+glyph pair.  The final 34,411-row gzip trace in this session is
+`/tmp/voynich_depth0_token_trace.jsonl.gz`, SHA-256
+`a23ede848bf684aa222d0f4241fa5c9082e75401927c72f14b4ad3f22e84dbd7`.
+It contains per-expert losses, mixture responsibilities, and per-token matched
+residuals and exactly reconstructs the aggregate scores.  Next test
 cross-Currier/topic transfer and alternative EVA space treatments.  Preferred
 graphics: morphology-depth retention slopegraph, family-gain versus joint-
 weight anatomy matrix, and a quire/page boundary-residual atlas.  Mixture

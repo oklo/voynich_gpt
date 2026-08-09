@@ -8,12 +8,12 @@ Manuscript, with the original notebooks and logs retained as provenance.
 
 The main narrative is `RESEARCH_REPORT.md`.  The branch is `main`, the remote
 is `https://github.com/oklo/voynich_gpt.git`, and the previous pushed checkpoint
-is `4a32e24`.  The nested residual-link decomposition described below is the
-current checkpoint.
+is `25cc02e`.  The token-level residual trace described below is the current
+checkpoint.
 
 At the time of writing:
 
-- all 57 standard-library unit tests pass;
+- all 59 standard-library unit tests pass;
 - `git diff --check` passes;
 - Ruff is not installed in the environment, so no Ruff result is claimed;
 - all new analysis code is Python-standard-library only; and
@@ -168,6 +168,23 @@ Hebrew, 0.0044 Latin, 0.0211 *Picatrix*, and -0.0002 shuffled *Picatrix*.
 Edge characters overcondition ordinary words too.  Use depth 0 for the fair
 cross-script anatomy comparison and depths 1--2 only as sensitivity bounds.
 
+### Token trace for graphics
+
+`--token-output PATH` writes schema `voynich-residual-token-trace-v1`, one row
+per outer-held-out token.  A `.gz` suffix enables compression.  Rows contain
+page/line/word coordinates, boundary units, metadata, all expert and family log
+losses, full-mixture responsibilities, the dominant expert, and per-token mean
+matched-null losses and actual-link advantages.  Positive matched residual
+favors the real source.  Rows reconstruct both actual and permutation aggregate
+scores exactly; this is covered by a regression test.
+
+The final session artifact is
+`/tmp/voynich_depth0_token_trace.jsonl.gz`: 34,411 rows, 31 MB, SHA-256
+`a23ede848bf684aa222d0f4241fa5c9082e75401927c72f14b4ad3f22e84dbd7`.
+Its summary is `/tmp/voynich_depth0_trace_summary.json`.  Sort on the zero-based
+page, physical-line, and word indices before drawing manuscript order.  Do not
+interpret mixture responsibility as an information share.
+
 ## Reproduction
 
 Run the tests:
@@ -284,8 +301,8 @@ and required external Hebrew sources.
 ## Best next research step
 
 Localize the boundary-dominated result instead of fitting a still larger global
-mixture.  Export per-token expert log losses and aggregate them by quire,
-Currier, topic, paragraph line, and source/target edge pair.  Then test transfer:
+mixture.  Use the completed token trace to aggregate by quire, Currier, topic,
+paragraph line, and source/target edge pair.  Then test transfer:
 learn boundary tables and latent classes on Currier A (or one topic/hand proxy)
 and score Currier B, and reverse the direction.  A manuscript-wide stable
 boundary grammar is more compatible with an encoding or orthographic rule; a
