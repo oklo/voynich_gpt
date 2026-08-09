@@ -25,6 +25,9 @@ the original exploratory notebooks.
 - `scripts/residual_sequence_information.py`: held-out exact-token sequence
   coding after morphology/Currier/topic/line-position conditioning, with
   nuisance-matched permutations and reflowed language controls
+- `scripts/decompose_residual_links.py`: nested held-out decomposition into
+  boundary, copy/edit, latent-class, paragraph, exact-identity, and whole-line
+  experts with source-morphology-matched nulls
 - `scripts/prepare_hebrew_htr_adaptation.py`: auditable PAGE-XML preparation for
   a small handwriting-recognition adaptation pilot on BnF Hébreu 1199
 - `tests/`: parser, corpus-integrity, distance, and negative-control regression

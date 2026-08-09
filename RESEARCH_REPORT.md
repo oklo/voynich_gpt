@@ -788,6 +788,95 @@ cannot see.  What it establishes is narrower: after the strongest observed
 procedural variables are supplied, ordinary exact-word syntax is still not a
 useful held-out compressor of Voynichese.
 
+### Nested decomposition of the residual links
+
+The preceding experiment deliberately tested only two exact-identity channels.
+`scripts/decompose_residual_links.py` now addresses its main open alternative:
+perhaps the residual is expressed through boundary glyphs, approximate copying,
+latent word classes, paragraph state, or a larger pool of words on the preceding
+physical line rather than through one exact neighbor.
+
+The new audit keeps five whole-quire outer folds.  On each outer training
+partition it learns all parameters, then fits convex expert-mixture weights on
+three inner-quire out-of-fold prediction sets.  Only after that are parameters
+and weights frozen and applied to the untouched outer quire.  The experts are:
+
+- paragraph line/state;
+- previous-final to target-initial grouped-EVA transition;
+- two normalized copy/edit channels from the previous same-line word;
+- 8- and 16-class spherical clusters learned from training-only left/right
+  PPMI contexts;
+- the same edit and class channels averaged over every word on the preceding
+  physical line; and
+- exact previous-word and aligned-previous-line identities.
+
+Every conditional expert is a proper probability distribution formed as a
+smoothed conditional/morphology-matched marginal density ratio applied to the
+same procedural baseline.  Each family competes separately with that baseline;
+all experts also compete jointly.  Family gains are therefore not added in an
+arbitrary sequence.  The outer matched null shuffles exact same-line sources,
+aligned sources, and every prior-line pool slot while preserving Currier,
+topic, target line position, source morphology, and normalized source position.
+It changes 99.1% of scored Voynich records in the primary run.
+
+An early implementation failed its negative control: paragraph and exact-word
+experts could also act as alternative generic smoothers, giving word-shuffled
+*Picatrix* a spurious 0.065 bit/word joint gain.  Those results were discarded.
+Recasting the experts as conditional-to-marginal density ratios reduces the
+same shuffled control to 0.002 bit/word.  This correction is an important part
+of the result, not merely an implementation detail.
+
+At morphology depth 0, the target word's grouped-EVA length is supplied but its
+edge glyphs are not:
+
+| Corpus | Baseline code | Boundary | Exact identity | Latent class | Prior-line pool | Full mixture |
+|---|---:|---:|---:|---:|---:|---:|
+| **Voynich** | 4.3927 | **0.0630** | 0.0193 | 0.0066 | 0.0567 | **0.1239** |
+| Hebrew Wikipedia | 2.7660 | 0.0338 | 0.1075 | 0.0220 | 0.0338 | 0.1305 |
+| Latin Wikipedia | 2.5014 | 0.0316 | 0.0807 | 0.0321 | 0.1066 | 0.1442 |
+| Spanish *Picatrix* | 3.3620 | 0.1235 | 0.3506 | 0.1846 | 0.0291 | 0.3686 |
+| *Picatrix*, word-shuffled | 3.3060 | -0.0005 | -0.0007 | -0.0009 | 0.0028 | 0.0020 |
+
+The baseline is bits per target word; all other columns are held-out gains over
+that baseline.  Copy/edit and paragraph gains, omitted from the compact table,
+are respectively 0.0106 and 0.0074 bit/word for Voynich.  The full Voynich gain
+is positive in every outer fold (0.1004--0.1658 bit/word).  Actual Voynich links
+beat the matched null by 0.1180 bit/word jointly, also in every fold
+(0.0947--0.1379); all 49 permutations are worse, giving the attainable
+one-sided `p=0.02`.  Family-specific actual-over-null advantages are 0.1092 for
+the boundary channel, 0.0354 for the prior-line pool, 0.0277 for exact
+identity, 0.0092 for same-line copy/edit, and 0.0084 for latent classes.
+
+The total Voynich sequence gain is therefore not unusually low: it is close to
+the Hebrew and Latin controls under this finite expert family.  Its **anatomy**
+is different.  In the jointly selected model, mean outer-fold weight is 0.583
+on the boundary expert, 0.132 on loose prior-line edit affinity, and 0.126 on
+exact previous identity.  Hebrew and Latin instead put 0.845 and 0.624 on exact
+previous identity; *Picatrix* puts 0.908 there.  Voynich's latent-class experts
+receive only 0.0076 joint weight in total, compared with a 0.0066 bit/word
+family-only gain.  Thus the recovered signal looks primarily like an
+edge-constrained production trace, with a smaller exact lexical component,
+not like zero sequence and not like the tested ordinary lexical mixtures.
+
+This diagnosis is representation-sensitive.  Supplying progressively richer
+target morphology gives:
+
+| Target morphology supplied | Baseline code | Full net gain | Actual links over matched null | Null changed |
+|---|---:|---:|---:|---:|
+| length | 4.3927 | 0.1239 | 0.1180 | 99.1% |
+| length + first/last grouped-EVA unit | 1.3206 | 0.0103 | 0.0051 | 94.5% |
+| length + first/last two units | 0.3327 | -0.0015 | 0.0013 | 62.9% |
+
+The depth-1 null used 19 permutations (`p=0.05`, the resolution floor), as did
+depth 2.  This collapse does **not** uniquely diagnose Voynich: depth-1 full
+gains are 0.0037 Hebrew, 0.0044 Latin, 0.0211 *Picatrix*, and -0.0002 shuffled
+*Picatrix*.  First and last letters identify ordinary words very efficiently
+too.  The safe conclusion is consequently compositional: at length-only
+morphology Voynich allocates much more of its useful local dependence to the
+cross-space glyph boundary, whereas the tested ordered prose allocates much
+more to exact predecessor identity or latent classes.  This finite audit is
+neither a semantic-information bound nor proof of nonlanguage.
+
 ### Strongest defensible conclusion
 
 The entropy inversion does **not** prove that the manuscript has no linguistic
@@ -795,18 +884,21 @@ or semantic payload, and the requested “below the range of language” premise
 is false for a genuinely broad, genre-diverse range.  It does support a more
 precise statement:
 
-> Voynichese is strongly inconsistent with ordinary communicative prose in
-> which the marked spaces delimit reusable words, frequent surface word types
-> consistently represent frequent lexical or grammatical units, and local
-> syntax is visible in their sequence.
+> Under EVA's marked spaces, Voynichese is strongly inconsistent with ordinary
+> communicative prose whose local dependence is carried principally by reusable
+> surface-word identities or stable lexical classes.  Its tested sequence
+> information is instead dominated by cross-space edge-glyph constraints and
+> prior-line form affinity.
 
 This conclusion joins three independent observations: anomalously predictable
-word-internal spelling, weak rather than absent local identity-level word
-order, and a substantial held-out gain from physical line position.  After
-conditioning on morphology and layout, real neighbor links retain only a small
-association and do not improve the held-out code.  The information that a
-normal text places in word sequence appears here primarily in word shape and
-layout.
+word-internal spelling, boundary-dominated rather than absent local order, and
+a substantial held-out gain from physical line position.  The earlier narrow
+exact-neighbor model did not improve the held-out code, but the broader nested
+mixture does.  Its gain is control-sized in aggregate and nonzero in every
+quire fold; what differs is that exact identities and latent classes explain
+far less of it jointly than a final-to-initial glyph transition.  The tested
+surface behaves more like constrained form generation than ordinary lexical
+syntax, while leaving altered boundaries and encodings open.
 
 The surviving meaningful-text alternatives are consequently specific rather
 than unlimited: the marked spaces may not be linguistic boundaries; a
@@ -824,7 +916,7 @@ layout-conditioned pseudotext is now the simpler account.
 | Hebrew/other abjad plus word anagramming | Word-shape rank; herbal-specific match to period Hebrew controls; low vowels | No coherent output; herbal formula sequences absent; no Hebrew zodiac vocabulary under global exact keys; order signal too weak | Shape-level lead only; simple Hebrew translation/cipher versions strongly disfavored |
 | Verbose, lossy, or homophonic cipher | Can suppress visible lexical/syntactic repetition | Must also explain line position and local variants; very flexible | Viable but presently underspecified |
 | Code, notation, or steganographic carrier | Low linguistic order with genuine page/section structure | No recovered codebook or payload | Viable; high-value target |
-| Layout-conditioned pseudotext / self-citation | Local variants, low entropy, line effects, weak long-range order; best held-out likelihood here | Immediate previous-word copying adds almost nothing; must still explain section/hand differences and image-text anchors | Best fit among tested simple mechanisms; specific generator not identified |
+| Layout-conditioned pseudotext / self-citation | Local variants, low entropy, line effects, boundary-dominated order; best held-out likelihood here | Must reproduce the real exact-link and prior-line-pool gains, section/hand differences, and image-text anchors | Best fit among tested simple mechanisms; specific generator not identified |
 
 No purely textual statistic can prove “nonsense” against an arbitrarily
 powerful cipher: such a cipher can map any plaintext to any ciphertext.  A fair
@@ -991,6 +1083,41 @@ python3 scripts/residual_sequence_information.py \
   --control 'Middle English Cirurgie=/tmp/voynich-public-entropy/Corpora/Historical_texts/Cirurgie' \
   --shuffled-control 'Spanish Picatrix shuffled=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix'
 ```
+
+The corrected nested decomposition and its depth-1 sensitivity use:
+
+```bash
+python3 scripts/decompose_residual_links.py \
+  --outer-folds 5 \
+  --inner-folds 3 \
+  --morphology-depth 0 \
+  --vocabulary 512 \
+  --strength 20 \
+  --permutations 49
+
+python3 scripts/decompose_residual_links.py \
+  --skip-voynich \
+  --outer-folds 5 \
+  --inner-folds 3 \
+  --morphology-depth 0 \
+  --vocabulary 512 \
+  --strength 20 \
+  --permutations 0 \
+  --control 'Hebrew Wikipedia=/tmp/voynich-public-entropy/Corpora/Wikipedia_texts/full/Hebrew' \
+  --control 'Latin Wikipedia=/tmp/voynich-public-entropy/Corpora/Wikipedia_texts/full/Latin' \
+  --control 'Spanish Picatrix=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix' \
+  --shuffled-control 'Spanish Picatrix shuffled=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix'
+```
+
+Set `--morphology-depth 1` for the matched control sensitivity.  The Voynich
+depth-1 and depth-2 null runs used 19 permutations.  The control SHA-256 hashes
+were
+`d3acd061b5f9dd791e30fe486bc8b07ec0de96609a4493bc29e8b463bfe7b992`
+(Hebrew),
+`8aeeac4a6f1fe33930ae436702013c892faf05244b9ff5785f855203ea73642e`
+(Latin), and
+`e170a60a4e2d1403770f64a92f907937a4394581442c1a4c2c6f01c1e2690c5d`
+(*Picatrix*).
 
 The HTR preparation tool takes a Kraken PAGE-XML file containing baseline OCR
 and transfers line boundaries from the catalog alignment while keeping the

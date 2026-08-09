@@ -7,14 +7,13 @@ dependency-light, falsification-first audit of claims about the Voynich
 Manuscript, with the original notebooks and logs retained as provenance.
 
 The main narrative is `RESEARCH_REPORT.md`.  The branch is `main`, the remote
-is `https://github.com/oklo/voynich_gpt.git`, and commits through `b00c864`
-were pushed before this handoff was written.  The residual-sequence experiment
-described below is the next checkpoint and should be committed and pushed with
-this file.
+is `https://github.com/oklo/voynich_gpt.git`, and the previous pushed checkpoint
+is `4a32e24`.  The nested residual-link decomposition described below is the
+current checkpoint.
 
 At the time of writing:
 
-- all 50 standard-library unit tests pass;
+- all 57 standard-library unit tests pass;
 - `git diff --check` passes;
 - Ruff is not installed in the environment, so no Ruff result is claimed;
 - all new analysis code is Python-standard-library only; and
@@ -26,11 +25,12 @@ At the time of writing:
 No translation or decipherment has been established.  The strongest current
 result is structural:
 
-> Under EVA's marked spaces and stable exact surface-word identity, Voynichese
-> is a poor match for ordinary communicative prose.  Its dominant predictable
-> structure is word-internal and layout-conditioned.  Exact neighboring word
-> identities have a real but weak association after those variables are
-> supplied, and they do not improve held-out compression.
+> Under EVA's marked spaces, Voynichese has real held-out local sequence
+> information, but it is allocated very differently from the tested prose.
+> Cross-space edge-glyph transitions dominate the joint model, while exact
+> predecessor identities and latent lexical classes are much weaker.  This is
+> more consistent with constrained form generation than ordinary lexical
+> syntax, without proving nonlanguage or nonsense.
 
 This is evidence against ordinary plaintext and stable simple substitution.
 It is not proof of nonsense.  Altered boundaries, homophonic/verbose/lossy
@@ -82,7 +82,7 @@ to the equal-mixture value.  At 99 permutations, all ordered corpora attained
 the minimum `p=0.01`; shuffled *Picatrix* had `p=0.69`.  A 199-permutation
 Voynich-only run gave `p=0.005`.
 
-The apparent tension is important: real links score better than matched fake
+The apparent tension was important: real links scored better than matched fake
 links, but the exact-identity model scores worse than the procedural baseline.
 The first comparison cancels model complexity and detects a small association;
 the second asks whether the association is strong enough to be a useful
@@ -101,6 +101,72 @@ Sensitivity results for Voynich:
 The fine morphology setting is not the primary cross-language comparison:
 first/last characters identify control-language words at different rates and
 can condition almost all their lexical uncertainty away.
+
+## Nested residual-link decomposition
+
+Implementation: `scripts/decompose_residual_links.py`
+
+Tests: `tests/test_decompose_residual_links.py`
+
+This is the completed version of the previous handoff's “best next research
+step.”  It adds paragraph state, final-to-initial grouped-EVA boundary
+transitions, two normalized copy/edit channels, training-only 8/16-way PPMI
+word classes, whole-previous-line edit/class pools, and corrected exact
+identity channels.  Five whole-quire outer folds are untouched while mixture
+weights are learned from three inner-quire out-of-fold sets.  Every feature
+expert is a proper conditional/morphology-marginal density-ratio distribution.
+
+The matched null preserves Currier, topic, target line position, same-line
+source morphology, every previous-line source morphology and normalized slot,
+and the target itself.  It changes 99.1% of depth-0 Voynich records.
+
+Primary depth-0 results (held-out gain over the same procedural baseline,
+bits/word):
+
+| Corpus | Boundary | Exact identity | Latent class | Previous-line pool | Full |
+|---|---:|---:|---:|---:|---:|
+| **Voynich** | **0.0630** | 0.0193 | 0.0066 | 0.0567 | **0.1239** |
+| Hebrew Wikipedia | 0.0338 | 0.1075 | 0.0220 | 0.0338 | 0.1305 |
+| Latin Wikipedia | 0.0316 | 0.0807 | 0.0321 | 0.1066 | 0.1442 |
+| Spanish *Picatrix* | 0.1235 | 0.3506 | 0.1846 | 0.0291 | 0.3686 |
+| Word-shuffled *Picatrix* | -0.0005 | -0.0007 | -0.0009 | 0.0028 | 0.0020 |
+
+Voynich actual links beat 49 matched permutations by 0.1180 bit/word jointly
+(`p=0.02`, the resolution floor).  The advantage is positive in all outer
+folds (0.0947--0.1379); net full gain is also positive in all folds
+(0.1004--0.1658).  Mean joint weights expose the main contrast:
+
+- Voynich: boundary 0.583, previous-line loose edit 0.132, exact previous word
+  0.126, paragraph 0.106;
+- Hebrew: exact previous word 0.845, previous-line loose edit 0.096, boundary
+  0.044;
+- Latin: exact previous word 0.624, previous-line loose edit 0.135, line-class
+  experts 0.173 combined, boundary 0.032; and
+- *Picatrix*: exact previous word 0.908 and class-16 0.041.
+
+The total Voynich gain is therefore comparable with Hebrew and Latin in this
+finite suite.  Do not describe it as “no sequence” or as comfortably below all
+language.  The defensible novelty is its composition: boundary mechanics carry
+what exact word identity or class carries in the controls.
+
+The negative control caught and corrected a real implementation mistake.  An
+initial version allowed paragraph and exact-identity experts to double as
+alternate generic smoothers and gave shuffled *Picatrix* +0.065 bit/word.
+Those results were discarded.  Conditional/marginal density-ratio experts
+reduce it to +0.0020 at depth 0 and -0.0002 at depth 1.
+
+Morphology sensitivity:
+
+| Depth | Supplied target form | Baseline | Full gain | Actual over null |
+|---:|---|---:|---:|---:|
+| 0 | grouped-EVA length | 4.3927 | 0.1239 | 0.1180 |
+| 1 | length + first/last unit | 1.3206 | 0.0103 | 0.0051 |
+| 2 | length + first/last two units | 0.3327 | -0.0015 | 0.0013 |
+
+This collapse is not uniquely Voynich.  At depth 1, full gains are 0.0037
+Hebrew, 0.0044 Latin, 0.0211 *Picatrix*, and -0.0002 shuffled *Picatrix*.
+Edge characters overcondition ordinary words too.  Use depth 0 for the fair
+cross-script anatomy comparison and depths 1--2 only as sensitivity bounds.
 
 ## Reproduction
 
@@ -133,6 +199,30 @@ python3 scripts/residual_sequence_information.py \
   --control 'Middle English Cirurgie=/tmp/voynich-public-entropy/Corpora/Historical_texts/Cirurgie' \
   --shuffled-control 'Spanish Picatrix shuffled=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix'
 ```
+
+Run the nested decomposition for Voynich and then the controls without
+recomputing Voynich:
+
+```bash
+python3 scripts/decompose_residual_links.py \
+  --outer-folds 5 --inner-folds 3 \
+  --morphology-depth 0 --vocabulary 512 --strength 20 \
+  --permutations 49
+
+python3 scripts/decompose_residual_links.py \
+  --skip-voynich \
+  --outer-folds 5 --inner-folds 3 \
+  --morphology-depth 0 --vocabulary 512 --strength 20 \
+  --permutations 0 \
+  --control 'Hebrew Wikipedia=/tmp/voynich-public-entropy/Corpora/Wikipedia_texts/full/Hebrew' \
+  --control 'Latin Wikipedia=/tmp/voynich-public-entropy/Corpora/Wikipedia_texts/full/Latin' \
+  --control 'Spanish Picatrix=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix' \
+  --shuffled-control 'Spanish Picatrix shuffled=/tmp/voynich-public-entropy/Corpora/Historical_texts/Picatrix'
+```
+
+The depth-1 control run changes only `--morphology-depth 1`; Voynich depth-1
+and depth-2 runs used `--permutations 19`.  Full runs are CPU-heavy because
+every mixture weight is selected from inner-quire out-of-fold predictions.
 
 The `--shuffled-control` option performs a true deterministic word shuffle in
 memory.  Do not use `data/capote_wordscramble_char/clean_wordshuffled_incoldblood.txt`
@@ -187,22 +277,24 @@ and required external Hebrew sources.
   word-order benchmark.
 - `scripts/residual_sequence_information.py`: conditional residual identity
   experiment and matched permutations.
+- `scripts/decompose_residual_links.py`: nested boundary/edit/class/paragraph/
+  previous-line decomposition with density-ratio experts and strict matched
+  nulls.
 
 ## Best next research step
 
-Explain, rather than merely detect, the remaining 0.067-bit/word link signal.
-Build a nested-quire model that adds the following one at a time:
+Localize the boundary-dominated result instead of fitting a still larger global
+mixture.  Export per-token expert log losses and aggregate them by quire,
+Currier, topic, paragraph line, and source/target edge pair.  Then test transfer:
+learn boundary tables and latent classes on Currier A (or one topic/hand proxy)
+and score Currier B, and reverse the direction.  A manuscript-wide stable
+boundary grammar is more compatible with an encoding or orthographic rule; a
+page-local effect that follows physical adjacency is more compatible with a
+generation procedure.  Pair this with alternative EVA space treatments,
+because a cross-space glyph rule is precisely the result most vulnerable to
+incorrect token boundaries.
 
-1. cross-boundary final-to-initial EVA transition;
-2. normalized edit/copy family between adjacent forms;
-3. latent word classes learned on training quires only;
-4. paragraph-start and within-paragraph state; and
-5. previous-line pools beyond the single aligned token.
-
-Every component should be selected on inner training folds, then scored on
-untouched outer quires against the same matched permutations.  If boundary and
-copy/edit features absorb the 0.067 bits and latent identity classes add no
-net compression, the residual is best understood as a production trace.  If a
-stable latent class model adds control-like held-out gain and transfers across
-Currier/hand/topic strata, that would be the first serious evidence here for a
-hidden lexical or grammatical payload.
+For visualization, prioritize a morphology-depth retention slopegraph, a
+family-gain/joint-weight “signal anatomy” matrix, and a quire-by-quire boundary
+residual atlas.  Do not make mixture weights look additive: they measure model
+reliance among correlated experts, not shares of semantic information.

@@ -33,7 +33,22 @@
   +0.167 to +0.549 bit/word; shuffled *Picatrix* gains -0.021.
 - The residual Voynich association is mostly previous-word (~0.096 bit/word
   versus matched links), with a smaller previous-line component (~0.018).
-- Therefore say “real but weak surface sequence,” not “no word order.”
+- A corrected nested decomposition supersedes the narrow model as the best
+  residual result.  At length-only morphology, Voynich gains 0.1239 bit/word
+  jointly and actual links beat strict morphology-matched nulls by 0.1180
+  (`p=0.02` with 49 permutations); both are positive in all five quire folds.
+- The aggregate gain is comparable with Hebrew (0.1305) and Latin (0.1442), so
+  do not say Voynich sequence is comfortably below language.  Its composition
+  differs: joint weight is 0.583 boundary and only 0.126 exact predecessor,
+  versus 0.624--0.908 exact predecessor in the ordered controls.
+- Family-only Voynich gains are boundary 0.0630, prior-line pool 0.0567, exact
+  identity 0.0193, copy/edit 0.0106, paragraph 0.0074, latent class 0.0066.
+- Supplying first/last grouped-EVA units collapses Voynich full gain to 0.0103,
+  but also collapses Hebrew/Latin to 0.0037/0.0044; this is an overconditioning
+  sensitivity, not a unique nonlanguage diagnostic.  Depth 2 gives Voynich
+  -0.0015 net.
+- Therefore say “real, boundary-dominated surface sequence,” not “no word
+  order” and not ordinary control-like lexical sequencing.
 - The best tested simple mechanism remains native layout-conditioned
   morphology.  This favors procedural/pseudotext or nonordinary encoding over
   plaintext, but does not prove nonsense.
@@ -67,6 +82,10 @@
   2. net gain over a simpler held-out code; and
   3. total or semantic information, which these tests do not estimate.
 - Do not claim a universal upper bound on payload from surface statistics.
+- Density-ratio feature experts are required here.  An initial nested model let
+  paragraph/exact experts act as alternate smoothers and spuriously gave
+  shuffled *Picatrix* +0.065 bit/word; the corrected negative control is
+  +0.0020 (depth 0) and -0.0002 (depth 1).
 
 ## Known trap
 
@@ -86,13 +105,14 @@ shuffle.
   - `3c5c140 Add reproducible Voynich hypothesis audits`
   - `b00c864 Add information bound and word order benchmarks`
 - Test command: `python3 -m unittest discover -s tests -v`.
-- Current suite: 50 passing tests.
+- Current suite: 57 passing tests.
 - Ruff was unavailable in the August 2026 environment; do not imply it ran.
 
 ## Next priority
 
-Decompose the 0.067-bit/word residual using nested held-out quires: boundary
-glyph transition, edit/copy family, latent lexical class, paragraph state, and
-larger previous-line pools.  A lexical-payload claim requires stable classes
-that add net held-out compression and transfer across Currier, hand, and topic;
-otherwise interpret the residual as a production trace.
+Export per-token expert log losses and localize the boundary-dominated signal
+by quire, Currier, topic, paragraph position, and glyph pair.  Then test
+cross-Currier/topic transfer and alternative EVA space treatments.  Preferred
+graphics: morphology-depth retention slopegraph, family-gain versus joint-
+weight anatomy matrix, and a quire/page boundary-residual atlas.  Mixture
+weights are reliance among correlated experts, not additive information shares.
