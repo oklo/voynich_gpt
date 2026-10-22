@@ -7,9 +7,10 @@ dependency-light, falsification-first audit of claims about the Voynich
 Manuscript, with the original notebooks and logs retained as provenance.
 
 The main narrative is `RESEARCH_REPORT.md`.  The branch is `main`, the remote
-is `https://github.com/oklo/voynich_gpt.git`, and the previous pushed checkpoint
-is `25cc02e`.  The token-level residual trace described below is the current
-checkpoint.
+is `https://github.com/oklo/voynich_gpt.git`, and the latest analytical
+checkpoint is `2d7c61c`; HEAD may contain a later documentation-only handoff
+commit.  `NEXT_SESSION_PROMPT.md` is the self-contained restart prompt for the
+planned graphics-design session.
 
 At the time of writing:
 

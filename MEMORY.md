@@ -106,6 +106,7 @@ shuffle.
   - `b00c864 Add information bound and word order benchmarks`
   - `4a32e24 Measure residual Voynich sequence information`
   - `25cc02e Decompose residual Voynich sequence signal`
+  - `2d7c61c Export token-level residual traces`
 - Test command: `python3 -m unittest discover -s tests -v`.
 - Current suite: 59 passing tests.
 - Ruff was unavailable in the August 2026 environment; do not imply it ran.

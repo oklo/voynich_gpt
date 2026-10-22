@@ -6,6 +6,7 @@ the original exploratory notebooks.
 - [Research report](RESEARCH_REPORT.md)
 - [Research handoff](HANDOFF.md)
 - [Durable project memory](MEMORY.md)
+- [Fresh-session restart prompt](NEXT_SESSION_PROMPT.md)
 - `scripts/audit_voynich.py`: IVTFF-aware corpus parser, permutation tests,
   representation sensitivity, matched natural-language controls, and held-out
   sequence models
